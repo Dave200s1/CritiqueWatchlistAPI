@@ -1,6 +1,6 @@
-# MovieMosaic
-![npm bundle size (version)](https://img.shields.io/badge/version-0.0.1-darkblue)  ![npm bundle size (version)](https://img.shields.io/badge/language-python3-yellow)  ![npm bundle size (version)](https://img.shields.io/badge/framework-FastAPI-lightgreen) 
 # 🎬 Critique Watchlist API
+![npm bundle size (version)](https://img.shields.io/badge/version-0.0.1-darkblue)  ![npm bundle size (version)](https://img.shields.io/badge/language-python3-yellow)  ![npm bundle size (version)](https://img.shields.io/badge/framework-FastAPI-lightgreen) 
+
 # tl;dr
 A FastAPI-powered movie tracking system that lets you manage and rate films in your personal watchlist.
 
