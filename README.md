@@ -1,7 +1,12 @@
 # MovieMosaic
+![npm bundle size (version)](https://img.shields.io/badge/version-0.0.1-darkblue)  ![npm bundle size (version)](https://img.shields.io/badge/language-python3-yellow)  ![npm bundle size (version)](https://img.shields.io/badge/framework-FastAPI-lightgreen) 
 # 🎬 Critique Watchlist API
-
+# tl;dr
 A FastAPI-powered movie tracking system that lets you manage and rate films in your personal watchlist.
+
+# Project Overview
+
+This FastAPI-powered Critique Watchlist API demonstrates a complete backend system for managing a personal movie collection, combining SQLite database persistence with RESTful endpoint design. It enables real-time CRUD operations on film entries with rating tracking (0-10 scale) and watch status management, showcasing practical integration of database operations with Pydantic model validation. While optimized for development environments, the production-ready architecture can be extended with authentication and scaled databases for deployment.
 
 ## Features
 
