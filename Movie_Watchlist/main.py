@@ -1,76 +1,125 @@
 from fastapi import  FastAPI,HTTPException
 from models.movie_create import  MovieCreate
 from models.movie_update import  MovieUpdate
+import sqlite3
+from contextlib import closing
+
 
 api = FastAPI(title= 'Welcome to Critique Watchlist API !',version= '0.0.1')
 
 #in memory Data
 #Rating i out of 10
-data = [
-    {'movie_id':1,'title':'Avatar','year':2011,'genre':'Fantasy','watched':False,'rating':7},
-    {'movie_id': 2, 'title': 'The Shawshank Redemption', 'year': 1994, 'genre': 'Drama', 'watched': True,
-     'rating': 9.3},
-    {'movie_id': 3, 'title': 'Inception', 'year': 2010, 'genre': 'Sci-Fi', 'watched': True, 'rating': 8.8},
-    {'movie_id': 4, 'title': 'Pulp Fiction', 'year': 1994, 'genre': 'Crime', 'watched': False, 'rating': None}
-]
+
+def get_db():
+    return  sqlite3.connect('data.db')
+
+def row_to_dict(row):
+    return dict(zip([col[0] for col in row.description], row))
 
 #CRUD Methods
 #Create
-@api.post('/movies',response_model=dict)
+@api.post('/movies', response_model=dict)
 def add_movie(movie: MovieCreate):
     try:
-        if not data:
-            new_entry_id = 1
-        else:
-            new_entry_id = max(item['movie_id'] for item in data) + 1
+        with closing(get_db()) as db:
+            cursor = db.cursor()
+            cursor.execute('''
+                INSERT INTO movies (title, year, genre, watched, rating)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                movie.title,
+                movie.year,
+                movie.genre,
+                int(movie.watched),  # Convert bool to int for SQLite
+                movie.rating
+            ))
+            db.commit()
 
-        new_entry = {
-            'movie_id': new_entry_id,
-            'title': movie.title,
-            'year': movie.year,
-            'genre': movie.genre,
-            'watched': movie.watched,
-            'rating': movie.rating
-        }
-        data.append(new_entry)
-        return new_entry
 
+            new_id = cursor.lastrowid
+            return {
+                "movie_id": new_id,
+                "title": movie.title,
+                "year": movie.year,
+                "genre": movie.genre,
+                "watched": movie.watched,
+                "rating": movie.rating
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-#Read
+
 @api.get('/movies/{movie_id}')
-def display_film(movie_id: int = None):
-    for movie in data:
-        if movie['movie_id'] == movie_id:
-            return {'result: ': movie}
+def display_film(movie_id: int):
+    with closing(get_db()) as db:
+        db.row_factory = sqlite3.Row
+        cursor = db.cursor()
+        cursor.execute('''
+            SELECT * FROM movies WHERE movie_id = ?
+        ''', (movie_id,))
+        movie = cursor.fetchone()
 
-#Update Todo !!!
+        if not movie:
+            raise HTTPException(status_code=404, detail="Movie not found")
+
+
+        movie_dict = dict(movie)
+        movie_dict['watched'] = bool(movie_dict['watched'])  # Convert int back to bool
+        return movie_dict
+
+
 @api.put('/movies/{movie_id}')
-def update_film(movie_id: int,updated_data: MovieUpdate ):
-    for idx, movie in enumerate(data):
-        if movie['movie_id'] == movie_id:
-            # Update only provided fields
-            if updated_data.title is not None:
-                movie['title'] = updated_data.title
-            if updated_data.year is not None:
-                movie['year'] = updated_data.year
-            if updated_data.genre is not None:
-                movie['genre'] = updated_data.genre
-            if updated_data.watched is not None:
-                movie['watched'] = updated_data.watched
-            if updated_data.rating is not None:
-                movie['rating'] = updated_data.rating
-            return {"message": "movie updated", "updated_task": movie}
-        raise HTTPException(status_code=404, detail="movie not found")
+def update_film(movie_id: int, updated_data: MovieUpdate):
+    try:
+        with closing(get_db()) as db:
+            db.row_factory = sqlite3.Row
+            update_fields = updated_data.dict(exclude_unset=True)
 
-#Delete
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+
+
+            if 'watched' in update_fields:
+                update_fields['watched'] = int(update_fields['watched'])
+
+            set_clause = ", ".join([f"{key} = ?" for key in update_fields.keys()])
+            values = list(update_fields.values())
+            values.append(movie_id)
+
+            cursor = db.cursor()
+            cursor.execute(f'''
+                UPDATE movies 
+                SET {set_clause}
+                WHERE movie_id = ?
+            ''', values)
+
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Movie not found")
+
+            db.commit()
+
+
+            cursor.execute('SELECT * FROM movies WHERE movie_id = ?', (movie_id,))
+            updated_movie = cursor.fetchone()
+            movie_dict = dict(updated_movie)
+            movie_dict['watched'] = bool(movie_dict['watched'])
+
+            return {"message": "Movie updated", "updated_movie": movie_dict}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api.delete('/movies/{movie_id}')
-def delete_film(movie_id:int = None):
-    for idx,movie in enumerate(data):
-        if movie['movie_id'] == movie_id:
-            return data.pop(idx)
-    raise HTTPException(status_code=404, detail="Task not found")
+def delete_film(movie_id: int):
+    with closing(get_db()) as db:
+        cursor = db.cursor()
+        cursor.execute('DELETE FROM movies WHERE movie_id = ?', (movie_id,))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Movie not found")
+
+        db.commit()
+        return {"message": "Movie deleted successfully"}
 
 if __name__ == "__main__":
     import uvicorn
